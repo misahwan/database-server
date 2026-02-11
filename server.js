@@ -1,4 +1,5 @@
 const net = require('net');
+const fs = require('fs'); // <--- NEW: File System module (The Robot's Printer)
 
 // The "Brain" - In-memory key-value store
 const store = new Map();
@@ -6,8 +7,7 @@ const store = new Map();
 const server = net.createServer((socket) => {
     console.log('Client connected');
 
-    // "Event Loop": The robot waits for data. 
-    // Node.js handles multiple clients by switching between them incredibly fast (Concurrency).
+    // "Event Loop": The robot waits for data.
     socket.on('data', (data) => {
         
         // 1. Clean the input (remove spaces/newlines)
@@ -20,10 +20,11 @@ const server = net.createServer((socket) => {
         const key = parts[1];
         const value = parts[2];
 
-        // 3. Logic: Execute command based on action (SET or GET)
+        // 3. Logic: Execute command based on action
         if (action === 'SET') {
             store.set(key, value);
             socket.write('OK\n');
+            
         } else if (action === 'GET') {
             const result = store.get(key);
             if (result) {
@@ -31,6 +32,22 @@ const server = net.createServer((socket) => {
             } else {
                 socket.write('(nil)\n');
             }
+            
+        } else if (action === 'SAVE') { // <--- NEW COMMAND
+            try {
+                // Step A: Convert the Map (Brain) into a text string
+                const json = JSON.stringify(Object.fromEntries(store));
+                
+                // Step B: Write that string to a real file on the hard drive
+                fs.writeFileSync('database.json', json);
+                
+                socket.write('OK\n');
+                console.log('Database saved to disk.');
+            } catch (err) {
+                socket.write('ERROR: Could not save\n');
+                console.error(err);
+            }
+            
         } else {
             socket.write('ERROR: Unknown Command\n');
         }
